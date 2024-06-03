@@ -1,5 +1,13 @@
 import numpy as np
 import cvxpy as cp
+from scipy.optimize import minimize, Bounds
+
+#define constants
+u0_lb = 0.62
+u0_ub = 1.0
+u1_lb = 81
+u1_ub = 99
+x_init = np.zeros(4)
 
 def f(xi, ui, RCVals):
     (Cau, Cal, Cvu, Cvl, Ral, Ralp, Rvl) = RCVals
@@ -10,25 +18,81 @@ def f(xi, ui, RCVals):
     qalp = (xi[1] - xi[3]) / Ralp
     qvl = (xi[3] - xi[2]) / Rvl
 
-    return [(ui[1] - qal - qaup)/ Cal, (qal - qalp)/ Cal, (qaup - qvl)/ Cvu, (qalp - qvl)/ Cvl]
+    return [(ui[1] - qal - qaup)/ Cau, (qal - qalp)/ Cal, (qaup - qvl)/ Cvu, (qalp - qvl)/ Cvl]
+
+# def solveNOC(paud, RCVals, Qd, h):
+#     N = paud.size - 1
+
+#     x_cvx = cp.Variable((N+1, 4)) # pau, pal, pvu, pvl
+#     u_cvx = cp.Variable((N, 2)) # Raup, Q
+
+#     obj = 100*((x_cvx[N,0] - paud[N]) / paud[N])**2
+#     constraints = []
+#     for i in range(N):
+#         obj += 100 * (((x_cvx[i,0] - paud[i]) / paud[i])**2 + ((u_cvx[i,1] - Qd)/Qd)**2) + u_cvx[i,0]**2
+#         constraints += [
+#             u_cvx[i,0] >= 0.62, u_cvx[i,0] <= 1.0,
+#             u_cvx[i,1] >= 81, u_cvx[i,1] <= 99,
+#             x_cvx[i+1] == x_cvx[i] + h * f(x_cvx[i], u_cvx[i], RCVals)
+#         ]
+#     prob = cp.Problem(cp.Minimize(obj), constraints)
+#     prob.solve()
+#     if prob.status != "optimal":
+#         raise RuntimeError("SCP solve failed. Problem status: " + prob.status)
+#     return x_cvx.value, u_cvx.value
 
 def solveNOC(paud, RCVals, Qd, h):
     N = paud.size - 1
 
-    x_cvx = cp.Variable((N+1, 4)) # pau, pal, pvu, pvl
-    u_cvx = cp.Variable((N, 2)) # Raup, Q
+    #Decision variables
+    #z = np.concatenate([x1, x2, x3, x4, u1, u2])
+    #note: x1 = pau, x2 = pal, x3 = pvu, x4 = pvl, u1 = Raup, u2 = Q
+    get_x0 = lambda z: z[:N+1]
+    get_x1 = lambda z: z[N+1:2*(N+1)]
+    get_x2 = lambda z: z[2*(N+1):3*(N+1)]
+    get_x3 = lambda z: z[3*(N+1):4*(N+1)]
+    get_u0 = lambda z: z[4*(N+1):4*(N+1)+N]
+    get_u1 = lambda z: z[4*(N+1)+N:4*(N+1)+2*N]
 
-    obj = 100*((x_cvx[N,0] - paud[N]) / paud[N])**2
-    constraints = []
-    for i in range(N):
-        obj += 100 * (((x_cvx[i,0] - paud[i]) / paud[i])**2 + ((u_cvx[i,1] - Qd)/Qd)**2) + u_cvx[i,0]**2
-        constraints += [
-            u_cvx[i,0] >= 0.62, u_cvx[i,0] <= 1.0,
-            u_cvx[i,1] >= 81, u_cvx[i,1] <= 99,
-            x_cvx[i+1] == x_cvx[i] + h * f(x_cvx[i], u_cvx[i], RCVals)
-        ]
-    prob = cp.Problem(cp.Minimize(obj), constraints)
-    prob.solve()
-    if prob.status != "optimal":
-        raise RuntimeError("SCP solve failed. Problem status: " + prob.status)
-    return x_cvx.value, u_cvx.value
+    #set up problem and 'minimize'
+    eps = 1e-3
+    ###figure out how to apply no bounds to the states... -np.inf and np.inf?
+    bounds = Bounds(
+        np.concatenate([-np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), u0_lb*np.ones(N), u1_lb*np.ones(N)]),
+        np.concatenate([np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), u0_ub*np.ones(N), u1_ub*np.ones(N)])
+    )
+
+    cost = lambda z: 100*((get_x0[-1]-paud[-1])/paud[-1])**2 + np.sum(np.square((get_x0[:-1]-paud[:-1])/paud[:-1]))+np.sum(np.square((get_u1[:]-Qd)/Qd)) + np.sum(np.square(get_u0[:]))
+
+    def constraints(z):
+        f_evaluated = f(np.array([get_x0(z), get_x1(z), get_x2(z), get_x3(z)]), np.array([get_u0(z), get_u1(z)]), RCVals)
+        return np.concatenate([
+            #dynamics
+            get_x0(z)[1:] - get_x0(z)[:-1] - h*(f_evaluated[0]),
+            get_x1(z)[1:] - get_x1(z)[:-1] - h*(f_evaluated[1]),
+            get_x2(z)[1:] - get_x2(z)[:-1] - h*(f_evaluated[2]),
+            get_x3(z)[1:] - get_x3(z)[:-1] - h*(f_evaluated[3]),
+            #initial conditions
+            get_x0(z)[0] - x_init[0],
+            get_x1(z)[1] - x_init[1],
+            get_x1(z)[2] - x_init[2],
+            get_x1(z)[3] - x_init[3],
+        ])
+    
+    #initial guess for iteration
+    z0 = np.concatenate([np.zeros(N+1), np.zeros(N+1), np.ones(zeros), np.zeros(N+1), np.zeros(N), np.zeros(N)])
+    result = minimize(cost, 
+                      z0, 
+                      bounds = bounds, 
+                      constraints={
+                          'type': 'eq',
+                          'fun': constraints
+                      },
+                      options = {'maxiter': 1000})
+    
+    verbose = True
+    if verbose:
+        print(result)
+
+    return get_x0(result.x), get_x1(result.x), get_x2(result.x), get_x3(result.x), get_u0(result.x), get_u1(result.x), 
+
