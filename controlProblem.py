@@ -2,18 +2,29 @@ import numpy as np
 import cvxpy as cp
 from scipy.optimize import minimize, Bounds
 
+import scipy as sp
+import matplotlib.pyplot as plt
+import wfdb
+
+# fixed random seed
+np.random.seed(0)
+
 #define constants
+#do these bounds vary from patient to patient?
 u0_lb = 0.62
 u0_ub = 1.0
 u1_lb = 81
 u1_ub = 99
 x_init = np.zeros(4)
+# RCVals = (1.7, 0.26, 51, 4.3, 0.15, 7.1, 0.028) #does this vary from patient to patient?
+# patientNum = 12726
 
 def f(xi, ui, RCVals):
     (Cau, Cal, Cvu, Cvl, Ral, Ralp, Rvl) = RCVals
 
     # intermediate variables: flows
-    qaup = (xi[0] - xi[2]) * cp.inv_pos(ui[0]) # AHHH FUDGE THIS MAY BE NONCONVEX... ohhh that's why supposed to use scipy minimize oops yea rewrite all this
+    # qaup = (xi[0] - xi[2]) * cp.inv_pos(ui[0]) # AHHH FUDGE THIS MAY BE NONCONVEX... ohhh that's why supposed to use scipy minimize oops yea rewrite all this
+    qaup = (xi[0] - xi[2]) / ui[0]
     qal = (xi[0] - xi[1]) / Ral
     qalp = (xi[1] - xi[3]) / Ralp
     qvl = (xi[3] - xi[2]) / Rvl
@@ -57,15 +68,21 @@ def solveNOC(paud, RCVals, Qd, h):
     #set up problem and 'minimize'
     eps = 1e-3
     ###figure out how to apply no bounds to the states... -np.inf and np.inf?
+    none_arr = np.empty(N+1)
+    none_arr[:] = None
     bounds = Bounds(
-        np.concatenate([-np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), u0_lb*np.ones(N), u1_lb*np.ones(N)]),
-        np.concatenate([np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), u0_ub*np.ones(N), u1_ub*np.ones(N)])
+        # np.concatenate([-np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), u0_lb*np.ones(N), u1_lb*np.ones(N)]),
+        # np.concatenate([np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), u0_ub*np.ones(N), u1_ub*np.ones(N)])
+        # np.concatenate([None, None, None, None, u0_lb*np.ones(N), u1_lb*np.ones(N)]),
+        # np.concatenate([None, None, None, None, u0_ub*np.ones(N), u1_ub*np.ones(N)])
+        np.concatenate([none_arr, none_arr, none_arr, none_arr, u0_lb*np.ones(N), u1_lb*np.ones(N)]),
+        np.concatenate([none_arr, none_arr, none_arr, none_arr, u0_ub*np.ones(N), u1_ub*np.ones(N)])
     )
 
-    cost = lambda z: 100*((get_x0[-1]-paud[-1])/paud[-1])**2 + np.sum(np.square((get_x0[:-1]-paud[:-1])/paud[:-1]))+np.sum(np.square((get_u1[:]-Qd)/Qd)) + np.sum(np.square(get_u0[:]))
+    cost = lambda z: 100*((get_x0(z)[-1]-paud[-1])/paud[-1])**2 + np.sum(np.square((get_x0(z)[:-1]-paud[:-1])/paud[:-1]))+np.sum(np.square((get_u1(z)[:]-Qd)/Qd)) + np.sum(np.square(get_u0(z)[:]))
 
     def constraints(z):
-        f_evaluated = f(np.array([get_x0(z), get_x1(z), get_x2(z), get_x3(z)]), np.array([get_u0(z), get_u1(z)]), RCVals)
+        f_evaluated = f(np.array([get_x0(z)[:-1], get_x1(z)[:-1], get_x2(z)[:-1], get_x3(z)[:-1]]), np.array([get_u0(z), get_u1(z)]), RCVals)
         return np.concatenate([
             #dynamics
             get_x0(z)[1:] - get_x0(z)[:-1] - h*(f_evaluated[0]),
@@ -73,14 +90,14 @@ def solveNOC(paud, RCVals, Qd, h):
             get_x2(z)[1:] - get_x2(z)[:-1] - h*(f_evaluated[2]),
             get_x3(z)[1:] - get_x3(z)[:-1] - h*(f_evaluated[3]),
             #initial conditions
-            get_x0(z)[0] - x_init[0],
-            get_x1(z)[1] - x_init[1],
-            get_x1(z)[2] - x_init[2],
-            get_x1(z)[3] - x_init[3],
+            get_x0(z)[0:1] - x_init[0],
+            get_x1(z)[0:1] - x_init[1],
+            get_x2(z)[0:1] - x_init[2],
+            get_x3(z)[0:1] - x_init[3],
         ])
     
     #initial guess for iteration
-    z0 = np.concatenate([np.zeros(N+1), np.zeros(N+1), np.ones(zeros), np.zeros(N+1), np.zeros(N), np.zeros(N)])
+    z0 = np.concatenate([np.zeros(N+1), np.zeros(N+1), np.zeros(N+1), np.zeros(N+1), np.zeros(N), np.zeros(N)])
     result = minimize(cost, 
                       z0, 
                       bounds = bounds, 
@@ -88,11 +105,11 @@ def solveNOC(paud, RCVals, Qd, h):
                           'type': 'eq',
                           'fun': constraints
                       },
-                      options = {'maxiter': 1000})
+                      options = {'maxiter': 10})
     
     verbose = True
     if verbose:
         print(result)
 
-    return get_x0(result.x), get_x1(result.x), get_x2(result.x), get_x3(result.x), get_u0(result.x), get_u1(result.x), 
+    return get_x0(result.x), get_x1(result.x), get_x2(result.x), get_x3(result.x), get_u0(result.x), get_u1(result.x)
 
