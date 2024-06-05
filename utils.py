@@ -12,9 +12,10 @@ def computeCO(weight, height, sex):
 
     return CO
 
-def computeMAP(bpSignal):
+def computeMAP(bpSignal, fs):
     # find systolic (high pressure) peaks
-    sysPksIdces = sp.signal.find_peaks(bpSignal, width=30)[0].astype(int) # come back and fix this
+    print(bpSignal.shape, fs)
+    sysPksIdces = sp.signal.find_peaks(bpSignal, height=25, distance=0.75*fs)[0].astype(int) # come back and fix this
 
     map = np.zeros(sysPksIdces.size-1)
     for i in range(sysPksIdces.size-1):
@@ -22,4 +23,8 @@ def computeMAP(bpSignal):
         diastolicBp = np.min(bpSignal[sysPksIdces[i]:sysPksIdces[i+1]])
         map[i] = diastolicBp + (systolicBp - diastolicBp)/ 3.0
     
-    return (map, sysPksIdces[:-1])
+    return (map, sysPksIdces)
+
+def computeRR(sysPkIdces, fs):
+    rr = np.diff(sysPkIdces) / fs
+    return rr

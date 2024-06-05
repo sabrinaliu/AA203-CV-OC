@@ -3,8 +3,6 @@ import cvxpy as cp
 from scipy.optimize import minimize, Bounds
 
 import scipy as sp
-import matplotlib.pyplot as plt
-import wfdb
 
 # fixed random seed
 np.random.seed(0)
@@ -41,27 +39,6 @@ def f(xi, ui, RCVals):
 
     return [(ui[1] - qal - qaup)/ Cau, (qal - qalp)/ Cal, (qaup - qvl)/ Cvu, (qalp - qvl)/ Cvl]
 
-# def solveNOC(paud, RCVals, Qd, h):
-#     N = paud.size - 1
-
-#     x_cvx = cp.Variable((N+1, 4)) # pau, pal, pvu, pvl
-#     u_cvx = cp.Variable((N, 2)) # Raup, Q
-
-#     obj = 100*((x_cvx[N,0] - paud[N]) / paud[N])**2
-#     constraints = []
-#     for i in range(N):
-#         obj += 100 * (((x_cvx[i,0] - paud[i]) / paud[i])**2 + ((u_cvx[i,1] - Qd)/Qd)**2) + u_cvx[i,0]**2
-#         constraints += [
-#             u_cvx[i,0] >= 0.62, u_cvx[i,0] <= 1.0,
-#             u_cvx[i,1] >= 81, u_cvx[i,1] <= 99,
-#             x_cvx[i+1] == x_cvx[i] + h * f(x_cvx[i], u_cvx[i], RCVals)
-#         ]
-#     prob = cp.Problem(cp.Minimize(obj), constraints)
-#     prob.solve()
-#     if prob.status != "optimal":
-#         raise RuntimeError("SCP solve failed. Problem status: " + prob.status)
-#     return x_cvx.value, u_cvx.value
-
 def solveNOC(paud, RCVals, Qd, h):
     N = paud.size - 1
 
@@ -77,29 +54,25 @@ def solveNOC(paud, RCVals, Qd, h):
 
     #set up problem and 'minimize'
     eps = 1e-3
-    ###figure out how to apply no bounds to the states... -np.inf and np.inf?
     none_arr = np.empty(N+1)
     none_arr[:] = None
     bounds = Bounds(
-        # np.concatenate([-np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), -np.inf*np.ones(N+1), u0_lb*np.ones(N), u1_lb*np.ones(N)]),
-        # np.concatenate([np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), np.inf*np.ones(N+1), u0_ub*np.ones(N), u1_ub*np.ones(N)])
         # np.concatenate([None, None, None, None, u0_lb*np.ones(N), u1_lb*np.ones(N)]),
         # np.concatenate([None, None, None, None, u0_ub*np.ones(N), u1_ub*np.ones(N)])
         np.concatenate([x0_lb*np.ones(N+1), x1_lb*np.ones(N+1), x2_lb*np.ones(N+1), x3_lb*np.ones(N+1), u0_lb*np.ones(N), u1_lb*np.ones(N)]),
         np.concatenate([x0_ub*np.ones(N+1), x1_ub*np.ones(N+1), x2_ub*np.ones(N+1), x3_ub*np.ones(N+1), u0_ub*np.ones(N), u1_ub*np.ones(N)])
     )
 
-    # cost = lambda z: 100*((get_x0(z)[-1]-paud[-1])/paud[-1])**2 + np.sum(np.square((get_x0(z)[:-1]-paud[:-1])/paud[:-1]))+np.sum(np.square((get_u1(z)[:]-Qd)/Qd)) + np.sum(np.square(get_u0(z)[:]))
     cost = lambda z: np.sum(np.square((get_x0(z)[:]-paud[:])/paud[:]))+ np.sum(np.square((get_u1(z)[:]-Qd)/Qd)) + 0.01 * np.sum(np.square(get_u0(z)[:]))
 
     def constraints(z):
         f_evaluated = f(np.array([get_x0(z)[:-1], get_x1(z)[:-1], get_x2(z)[:-1], get_x3(z)[:-1]]), np.array([get_u0(z), get_u1(z)]), RCVals)
         return np.concatenate([
             #dynamics
-            get_x0(z)[1:] - get_x0(z)[:-1] - h*(f_evaluated[0]),
-            get_x1(z)[1:] - get_x1(z)[:-1] - h*(f_evaluated[1]),
-            get_x2(z)[1:] - get_x2(z)[:-1] - h*(f_evaluated[2]),
-            get_x3(z)[1:] - get_x3(z)[:-1] - h*(f_evaluated[3]),
+            get_x0(z)[1:] - get_x0(z)[:-1] - h[:-1]*(f_evaluated[0]),
+            get_x1(z)[1:] - get_x1(z)[:-1] - h[:-1]*(f_evaluated[1]),
+            get_x2(z)[1:] - get_x2(z)[:-1] - h[:-1]*(f_evaluated[2]),
+            get_x3(z)[1:] - get_x3(z)[:-1] - h[:-1]*(f_evaluated[3]),
 
             #initial conditions (?)
             # get_x0(z)[0:1] - x_init[0],
