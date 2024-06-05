@@ -73,32 +73,25 @@ def solveNOC(paud, RCVals, Qd, h, tiltStartIdx, tiltEndIdx):
     x0_lb_array[tiltStartIdx:] = x_lb_tilt[0]
 
     x0_ub_array = np.zeros(N+1)
-    x0_ub_array[:tiltStartIdx] = x_ub_steadyState[0]; #x0_ub_array[tiltStartIdx:tiltEndIdx+1] = x_ub_tilt[0]; x0_ub_array[tiltEndIdx+1:] = x_ub_steadyState[0]
-    x0_ub_array[tiltStartIdx:] = x_ub_tilt[0]
+    x0_ub_array[:tiltStartIdx] = x_ub_steadyState[0]; x0_ub_array[tiltStartIdx:] = x_ub_tilt[0]
 
     x1_lb_array = np.zeros(N+1)
-    x1_lb_array[:tiltStartIdx] = x_lb_steadyState[1]; #x1_lb_array[tiltStartIdx:tiltEndIdx+1] = x_lb_tilt[1]; x1_lb_array[tiltEndIdx+1:] = x_lb_steadyState[1]
-    x1_lb_array[tiltStartIdx:] = x_lb_tilt[1]
+    x1_lb_array[:tiltStartIdx] = x_lb_steadyState[1]; x1_lb_array[tiltStartIdx:] = x_lb_tilt[1]
 
     x1_ub_array = np.zeros(N+1)
-    x1_ub_array[:tiltStartIdx] = x_ub_steadyState[1]; #x1_ub_array[tiltStartIdx:tiltEndIdx+1] = x_ub_tilt[1]; x1_ub_array[tiltEndIdx+1:] = x_ub_steadyState[1]
-    x1_ub_array[tiltStartIdx:] = x_ub_tilt[1]
+    x1_ub_array[:tiltStartIdx] = x_ub_steadyState[1]; x1_ub_array[tiltStartIdx:] = x_ub_tilt[1]
 
     x2_lb_array = np.zeros(N+1)
-    x2_lb_array[:tiltStartIdx] = x_lb_steadyState[2]; #x2_lb_array[tiltStartIdx:tiltEndIdx+1] = x_lb_tilt[2]; x2_lb_array[tiltEndIdx+1:] = x_lb_steadyState[2]
-    x2_lb_array[tiltStartIdx:] = x_lb_tilt[2]
+    x2_lb_array[:tiltStartIdx] = x_lb_steadyState[2]; x2_lb_array[tiltStartIdx:] = x_lb_tilt[2]
 
     x2_ub_array = np.zeros(N+1)
-    x2_ub_array[:tiltStartIdx] = x_ub_steadyState[2]; #x2_ub_array[tiltStartIdx:tiltEndIdx+1] = x_ub_tilt[2]; x2_ub_array[tiltEndIdx+1:] = x_ub_steadyState[2]
-    x2_ub_array[tiltStartIdx:] = x_ub_tilt[2]
+    x2_ub_array[:tiltStartIdx] = x_ub_steadyState[2]; x2_ub_array[tiltStartIdx:] = x_ub_tilt[2]
 
     x3_lb_array = np.zeros(N+1)
-    x3_lb_array[:tiltStartIdx] = x_lb_steadyState[3]; #x3_lb_array[tiltStartIdx:tiltEndIdx+1] = x_lb_tilt[3]; x3_lb_array[tiltEndIdx+1:] = x_lb_steadyState[3]
-    x3_lb_array[tiltStartIdx:] = x_lb_tilt[3]
+    x3_lb_array[:tiltStartIdx] = x_lb_steadyState[3]; x3_lb_array[tiltStartIdx:] = x_lb_tilt[3]
 
     x3_ub_array = np.zeros(N+1)
-    x3_ub_array[:tiltStartIdx] = x_ub_steadyState[3]; #x3_ub_array[tiltStartIdx:tiltEndIdx+1] = x_ub_tilt[3]; x3_ub_array[tiltEndIdx+1:] = x_ub_steadyState[3]
-    x3_ub_array[tiltStartIdx:] = x_ub_tilt[3]
+    x3_ub_array[:tiltStartIdx] = x_ub_steadyState[3]; x3_ub_array[tiltStartIdx:] = x_ub_tilt[3]
         
     u0_lb_array = np.empty(N); u0_lb_array[:] = None
     u0_lb_array[0] = u0_lb_steadyState; u0_lb_array[tiltStartIdx-1] = u0_lb_steadyState
@@ -147,11 +140,11 @@ def solveNOC(paud, RCVals, Qd, h, tiltStartIdx, tiltEndIdx):
             get_x2(z)[0:1] - x_init_steadyState[2],
             get_x3(z)[0:1] - x_init_steadyState[3],
 
-            # tilt start initial conditions
-            get_x0(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[0],
-            get_x1(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[1],
-            get_x2(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[2],
-            get_x3(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[3],
+            # # tilt start initial conditions
+            # get_x0(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[0],
+            # get_x1(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[1],
+            # get_x2(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[2],
+            # get_x3(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[3],
 
             # # tilt end (new steady state) conditions (but when does it really return to "steady state"?)
             # get_x0(z)[tiltEndIdx:tiltEndIdx+1] - x_init_steadyState[0],
