@@ -24,23 +24,6 @@ u0_lb_steadyState = 0.75; u0_ub_steadyState = 0.95 # only applied to start and e
 u0_lb_tilt = 0.2; u0_ub_tilt = 1.1 # only applied to start and end
 u1_lb = 50; u1_ub = 200 # we choose ourself
 
-# x0_lb = 50
-# x0_ub = 100
-# x1_lb = 50
-# x1_ub = 115
-# x2_lb = 0.3
-# x2_ub = 3.5
-# x3_lb = 1
-# x3_ub = 25
-# u0_lb = 0.2
-# u0_ub = 1.1
-# u1_lb = 0
-# u1_ub = 200
-# x_init = np.array([(x0_lb+x0_ub)/2, (x1_lb+x1_ub)/2, (x2_lb+x2_ub)/2, (x3_lb+x3_ub)/2])
-# x_init = np.zeros(4)
-# RCVals = (1.7, 0.26, 51, 4.3, 0.15, 7.1, 0.028) #does this vary from patient to patient?
-# patientNum = 12726
-
 def f(xi, ui, RCVals):
     (Cau, Cal, Cvu, Cvl, Ral, Ralp, Rvl) = RCVals
 
@@ -68,9 +51,9 @@ def solveNOC(paud, RCVals, Qd, h, tiltStartIdx, tiltEndIdx):
 
     #set up problem and 'minimize'
 
+    # Bounds
     x0_lb_array = np.zeros(N+1)
-    x0_lb_array[:tiltStartIdx] = x_lb_steadyState[0]; #x0_lb_array[tiltStartIdx:tiltEndIdx+1] = x_lb_tilt[0]; x0_lb_array[tiltEndIdx+1:] = x_lb_steadyState[0]
-    x0_lb_array[tiltStartIdx:] = x_lb_tilt[0]
+    x0_lb_array[:tiltStartIdx] = x_lb_steadyState[0]; x0_lb_array[tiltStartIdx:] = x_lb_tilt[0]
 
     x0_ub_array = np.zeros(N+1)
     x0_ub_array[:tiltStartIdx] = x_ub_steadyState[0]; x0_ub_array[tiltStartIdx:] = x_ub_tilt[0]
@@ -96,26 +79,18 @@ def solveNOC(paud, RCVals, Qd, h, tiltStartIdx, tiltEndIdx):
     u0_lb_array = np.empty(N); u0_lb_array[:] = None
     u0_lb_array[0] = u0_lb_steadyState; u0_lb_array[tiltStartIdx-1] = u0_lb_steadyState
     u0_lb_array[tiltStartIdx] = u0_lb_tilt; u0_lb_array[-1] = u0_lb_tilt
-    # u0_lb_array[tiltStartIdx] = u0_lb_tilt; u0_lb_array[tiltEndIdx] = u0_lb_tilt
-    # u0_lb_array[tiltEndIdx+1] = u0_lb_steadyState; u0_lb_array[-1] = u0_lb_steadyState
 
     u0_ub_array = np.empty(N); u0_ub_array[:] = None
     u0_ub_array[0] = u0_ub_steadyState; u0_ub_array[tiltStartIdx-1] = u0_ub_steadyState
     u0_ub_array[tiltStartIdx] = u0_ub_tilt; u0_ub_array[-1] = u0_ub_tilt
-    # u0_ub_array[tiltStartIdx] = u0_ub_tilt; u0_ub_array[tiltEndIdx] = u0_ub_tilt
-    # u0_ub_array[tiltEndIdx+1] = u0_ub_steadyState; u0_ub_array[-1] = u0_ub_steadyState
 
     u1_lb_array = np.empty(N); u1_lb_array[:] = None
     u1_lb_array[0] = u1_lb; u1_lb_array[tiltStartIdx-1] = u1_lb
     u1_lb_array[tiltStartIdx] = u1_lb; u1_lb_array[-1] = u1_lb
-    # u1_lb_array[tiltStartIdx] = u1_lb; u1_lb_array[tiltEndIdx] = u1_lb
-    # u1_lb_array[tiltEndIdx+1] = u1_lb; u1_lb_array[-1] = u1_lb
 
     u1_ub_array = np.empty(N); u1_ub_array[:] = None
     u1_ub_array[0] = u1_ub; u1_ub_array[tiltStartIdx-1] = u1_ub
     u1_ub_array[tiltStartIdx] = u1_ub; u1_ub_array[-1] = u1_ub
-    # u1_ub_array[tiltStartIdx] = u1_ub; u1_ub_array[tiltEndIdx] = u1_ub
-    # u1_ub_array[tiltEndIdx+1] = u1_ub; u1_ub_array[-1] = u1_ub
 
     bounds = Bounds(
         # initial steady state bounds
@@ -145,13 +120,6 @@ def solveNOC(paud, RCVals, Qd, h, tiltStartIdx, tiltEndIdx):
             # get_x1(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[1],
             # get_x2(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[2],
             # get_x3(z)[tiltStartIdx:tiltStartIdx+1] - x_init_tilt[3],
-
-            # # tilt end (new steady state) conditions (but when does it really return to "steady state"?)
-            # get_x0(z)[tiltEndIdx:tiltEndIdx+1] - x_init_steadyState[0],
-            # get_x1(z)[tiltEndIdx:tiltEndIdx+1] - x_init_steadyState[1],
-            # get_x2(z)[tiltEndIdx:tiltEndIdx+1] - x_init_steadyState[2],
-            # get_x3(z)[tiltEndIdx:tiltEndIdx+1] - x_init_steadyState[3],
-
         ])
     
     #initial guess for iteration
